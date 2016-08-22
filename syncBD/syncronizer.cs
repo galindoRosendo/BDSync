@@ -12,12 +12,12 @@ namespace syncBD
         /// <summary>
         /// Mensaje que se imprimira
         /// </summary>
-        private string message ="Mensaje:Esto es una prueba";
+        private string message = "Mensaje:Esto es una prueba";
 
         /// <summary>
         /// Fecha y hora donde inicia la transferencia de archivos
         /// </summary>
-        private string fechaFTPinicio = "FTPStarted at: " ;
+        private string fechaFTPinicio = "FTPStarted at: ";
 
         /// <summary>
         /// Sucursal donde se realiza la sincronizacion
@@ -32,56 +32,74 @@ namespace syncBD
         /// <summary>
         /// Fecha donde termina la transferencia de arvhivos
         /// </summary>
-        private string fechaFTPFin ="FTPEnded at: ";
+        private string fechaFTPFin = "FTPEnded at: ";
+
         private bool flagFolder = false;
         private string horainicioFTP = "";
         private string horaFinFTP = "";
         private string horainicioLog = "";
         private string horafinLog = "";
 
-        private string origin = Directory.GetCurrentDirectory();
-        private string destiny = ConfigurationManager.AppSettings["destiny"];
+        private static string origin = Directory.GetCurrentDirectory();
+        private static string destiny = ConfigurationManager.AppSettings["destiny"];
         private string logDestiny = ConfigurationManager.AppSettings["destiny"];
-        //private string origin = ConfigurationManager.AppSettings["origin"];
-        //private string destiny = ConfigurationManager.AppSettings["destiny"];
-        //private string logDestiny = ConfigurationManager.AppSettings["logDestiny"];
-        //private string store = ConfigurationManager.AppSettings["store"];
+        private string FTPorigin = Directory.GetCurrentDirectory();
 
-        private string[] transferData = new string[2];
+        
         private string[] datalog = new string[5];
+        private string[] ftpstartupline = new string[1] { "ftp -i -s:upload.bat" };
+        private string[] ftpuploadLines = new string[7] 
+        {
+            "open "+ConfigurationManager.AppSettings["ftIp"],
+            ConfigurationManager.AppSettings["ftpusr"],
+            ConfigurationManager.AppSettings["ftppwd"],
+            "cd myFolder",
+            "binary",
+            "put \"C:\\path\"",
+            "bye"
+        };
+        private string[] arguments = new string[2] 
+        {
+            //Argumentos para llamar a robocopy
+            string.Format("/C Robocopy /S {0} {1}", origin, destiny),
+            //Argumentos para llamar batch de ftp
+            string.Format("ftp -i -s:upload.bat")
+        };
 
         #endregion
 
         #region metodos
         /// <summary>
-        /// Metodo para crear archivo de texto que se usara para log
+        /// Metodo para crear archivos
         /// </summary>
-        /// <param name="Lineas">Arreglo de strings que son las lineas a insertar en el txt</param>
-        private void createTxt(string[] Lines)
+        /// <param name="path">Path donde sera creado el archivo</param>
+        /// <param name="name">Nombre y extencion del archivo</param>
+        /// <param name="Lines">Arreglo de strings que son las lineas a insertar en el archivo</param>
+        private void createFile(string path,string name,string[] Lines)
         {
             try
             {
+                Console.WriteLine("Creating {0} File", name);
                 // Example #3: Write only some strings in an array to a file.
                 // The using statement automatically flushes AND CLOSES the stream and calls 
                 // IDisposable.Dispose on the stream object.
                 // NOTE: do not use FileStream for text files because it writes bytes, but StreamWriter
                 // encodes the output as text.
                 using (System.IO.StreamWriter file =
-                    new System.IO.StreamWriter(origin + "\\" + sucursal + ".txt"))
+                    new System.IO.StreamWriter(path + "\\" + name))
                 {
                     foreach (string line in Lines)
                     {
                         file.WriteLine(line);
                     }
                 }
-                Console.Write(".");
-                Thread.Sleep(1000);
-                Console.Write("[ok]");
+                
+                Console.WriteLine(name+" Creation Status...[ok]");
             }
             catch (Exception)
             {
 
-                Console.WriteLine("[fail]");
+                Console.WriteLine(name + " Creation Status...[fail]");
             }
 
         }
@@ -89,42 +107,25 @@ namespace syncBD
         /// <summary>
         /// Metodo para mandar llamar la herramienta para transferencia de archivos
         /// </summary>
-        private void callRobocopy(string[] folders)
+        private void callTransferTool(string arguments)
         {
             try
             {
-                //Folders[]
-                //[0] origin
-                //[1] destinarion
                 Process p = new Process();
-                p.StartInfo.Arguments = string.Format("/C Robocopy /S {0} {1}", folders[0], folders[1]);
+                p.StartInfo.Arguments = arguments;
                 p.StartInfo.FileName = "CMD.EXE";
                 p.StartInfo.CreateNoWindow = false;
                 p.StartInfo.UseShellExecute = true;
                 p.Start();
                 p.WaitForExit();
-                Console.Write("[ok]\n");
+                message = "Procees Ended [Yes]";
+                Console.Write("Process Ended ...[Yes]\n");
 
-                //// TODO: Add exception handling
-                //string processName = command.Split(delimiters).ToList().ElementAt(0);    // split up command into pieces, select first "token" as the process name
-                //string commandArguments = command.Replace(processName + " ", ""); // remove the process name and following whitespace from the command itself, storing it in a new variable
-                //Process commandProcess = new Process(); // declare a new process to be used
-                //commandProcess.StartInfo.FileName = processName;    // add file start info for filename to process
-                //commandProcess.StartInfo.Arguments = commandArguments;  // add file start info for arguments to process
-                //commandProcess.StartInfo.UseShellExecute = false;  // skip permissions request
-                //commandProcess.Start();   // start process according to command's data
-                //commandProcess.WaitForExit();   // wait for the process to exit before continuing
-                //bool commandSuccessful = ParseCommandErrorCode(commandProcess, commandProcess.ExitCode);    // grab error code
-                //if (!commandSuccessful)
-                //{
-                //    // ERROR! abort operation and inform the user of the last completed operation, and how many commands have not been run
-                //} // end if
-                //Console.WriteLine("Error code: {0}", commandProcess.ExitCode);    // print error code
-                //commandProcess.Close(); // close process
             }
             catch (Exception)
             {
-                Console.Write("[fail]");
+                message = "Procees Ended [No]";
+                Console.Write("Process status ...[fail]");
             }
         }
 
@@ -164,7 +165,7 @@ namespace syncBD
         /// Metodo para llenar la informacion que ira en el archivo log.txt
         /// </summary>
         /// <returns></returns>
-        public string[] fillDatalog()
+        public void fillDatalog()
         {
             fechaFTPFin = fechaFTPFin + getDateOrTime(DateTime.Now, "fecha").ToString() + " " + horaFinFTP + getDateOrTime(DateTime.Now, "hora").ToString();
             datalog[0] = message;
@@ -172,19 +173,7 @@ namespace syncBD
             datalog[2] = fechaFTPinicio;
             datalog[3] = fechaFTPFin;
 
-            return datalog;
         } 
-
-        /// <summary>
-        /// Metodo para llenar las carpetas que seran origin y destino
-        /// </summary>
-        /// <returns></returns>
-        public string[] fillDataFolders()
-        {
-            transferData[0] = origin;
-            transferData[1] = destiny;
-            return transferData;
-        }
 
         /// <summary>
         /// Metodo para verificar si existe la carpeta de la fecha actual y saber si esta hecho el corte.
@@ -244,33 +233,19 @@ namespace syncBD
         /// </summary>
         public void folderAttempts()
         {
-            Console.Write("Checking for dayend 1st");
-            Thread.Sleep(1000);
-            Console.Write(".");
-            Thread.Sleep(1000);
-            Console.Write(".");
-            Thread.Sleep(1000);
-            flagFolder = checkFolder();
+            Console.Write("Checking for dayend 1st..");
             for (int i = 0; i <= 4; i++)
             {
+                flagFolder = checkFolder();
                 if (flagFolder == true)
                 {
                     Console.Write(".[ok]\n");
-                    Console.Write("Starting BDF Scan");
-                    Thread.Sleep(1000);
-                    Console.Write(".");
-                    Thread.Sleep(1000);
-                    Console.Write(".");
-                    Thread.Sleep(1000);
-                    Console.Write(".[ok]\n");
-                    fillDataFolders();
-                    Console.Write("Creating log file");
-                    Thread.Sleep(1000);
-                    Console.Write(".");
-                    Thread.Sleep(1000);
+                    Console.Write("Starting BDF Scan...[ok]\n");
+                    createFile(origin, "startupload.bat", ftpstartupline);
+                    createFile(origin, "upload.bat",ftpuploadLines);
+                    callTransferTool(arguments[1]);
                     fillDatalog();
-                    createTxt(datalog);
-                    callRobocopy(transferData);
+                    createFile(origin,sucursal+".txt",datalog);
                     break;
                 }
                 else if (i == 1 && flagFolder == true)
@@ -285,20 +260,10 @@ namespace syncBD
                     {
                         Console.Write(".[ok]\n");
                         Console.Write("Starting BDF Scan");
-                        Thread.Sleep(1000);
-                        Console.Write(".");
-                        Thread.Sleep(1000);
-                        Console.Write(".");
-                        Thread.Sleep(1000);
-                        Console.Write(".[ok]\n");
-                        fillDataFolders();
-                        Console.Write("Creating log file");
-                        Thread.Sleep(1000);
-                        Console.Write(".");
-                        Thread.Sleep(1000);
+                        Console.Write("Creating log file...");
                         fillDatalog();
-                        createTxt(datalog);
-                        callRobocopy(transferData);
+                        createFile(origin, sucursal + ".txt", datalog);
+
                     }
                     else
                     {
@@ -317,20 +282,10 @@ namespace syncBD
                     {
                         Console.Write(".[ok]\n");
                         Console.Write("Starting BDF Scan");
-                        Thread.Sleep(1000);
-                        Console.Write(".");
-                        Thread.Sleep(1000);
-                        Console.Write(".");
-                        Thread.Sleep(1000);
-                        Console.Write(".[ok]\n");
-                        fillDataFolders();
-                        Console.Write("Creating log file");
-                        Thread.Sleep(1000);
-                        Console.Write(".");
-                        Thread.Sleep(1000);
+                        Console.Write("Creating log file...");
                         fillDatalog();
-                        createTxt(datalog);
-                        callRobocopy(transferData);
+                        createFile(origin, sucursal + ".txt", datalog);
+
                     }
                     else
                     {
@@ -349,20 +304,10 @@ namespace syncBD
                     {
                         Console.Write(".[ok]\n");
                         Console.Write("Starting BDF Scan");
-                        Thread.Sleep(1000);
-                        Console.Write(".");
-                        Thread.Sleep(1000);
-                        Console.Write(".");
-                        Thread.Sleep(1000);
-                        Console.Write(".[ok]\n");
-                        fillDataFolders();
-                        Console.Write("Creating log file");
-                        Thread.Sleep(1000);
-                        Console.Write(".");
-                        Thread.Sleep(1000);
+                        Console.Write("Creating log file...");
                         fillDatalog();
-                        createTxt(datalog);
-                        callRobocopy(transferData);
+                        createFile(origin, sucursal + ".txt", datalog);
+
                     }
                     else
                     {
@@ -381,20 +326,10 @@ namespace syncBD
                     {
                         Console.Write(".[ok]\n");
                         Console.Write("Starting BDF Scan");
-                        Thread.Sleep(1000);
-                        Console.Write(".");
-                        Thread.Sleep(1000);
-                        Console.Write(".");
-                        Thread.Sleep(1000);
-                        Console.Write(".[ok]\n");
-                        fillDataFolders();
-                        Console.Write("Creating log file");
-                        Thread.Sleep(1000);
-                        Console.Write(".");
-                        Thread.Sleep(1000);
+                        Console.Write("Creating log file...");
                         fillDatalog();
-                        createTxt(datalog);
-                        callRobocopy(transferData);
+                        createFile(origin, sucursal + ".txt", datalog);
+
                     }
                     else
                     {
